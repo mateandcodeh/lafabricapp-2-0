@@ -1,0 +1,129 @@
+name: Build LaFabricApp 2.0
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Preparar entorno Android SDK
+        run: |
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/cmdline-tools/16.0/bin:$ANDROID_HOME/platform-tools:$PATH"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+
+      - name: Preparar proyecto Capacitor
+        run: |
+          mkdir -p www
+          if [ -f index.html ]; then
+            cp index.html www/index.html
+          fi
+          if [ -f assets/logo.png ]; then
+            cp assets/logo.png www/logo.png
+          fi
+          cat > package.json << 'EOF'
+          {
+            "name": "lafabricapp-android-wrapper",
+            "version": "1.0.0",
+            "private": true,
+            "dependencies": {
+              "@capacitor/core": "^6.1.2",
+              "@capacitor/cli": "^6.1.2",
+              "@capacitor/android": "^6.1.2"
+            }
+          }
+          EOF
+          cat > capacitor.config.json << 'EOF'
+          {
+            "appId": "com.lafabricapp.lafabricapp20",
+            "appName": "LaFabricApp 2.0",
+            "webDir": "www"
+          }
+          EOF
+          npm install --no-audit --no-fund
+          npx cap add android
+          npx cap copy android
+
+      - name: Aplicar logo de escritorio como ícono de la app
+        run: |
+          SRC_LOGO=""
+          if [ -f assets/logo.png ]; then
+            SRC_LOGO="assets/logo.png"
+          elif [ -f www/logo.png ]; then
+            SRC_LOGO="www/logo.png"
+          fi
+          if [ -n "$SRC_LOGO" ] && [ -f "$SRC_LOGO" ]; then
+            rm -rf android/app/src/main/res/mipmap-anydpi-v26
+            python3 - << 'PYEOF'
+import os, shutil
+src = os.environ.get("SRC_LOGO") or ("assets/logo.png" if os.path.exists("assets/logo.png") else "www/logo.png")
+sizes = {
+    "mipmap-mdpi": 48,
+    "mipmap-hdpi": 72,
+    "mipmap-xhdpi": 96,
+    "mipmap-xxhdpi": 144,
+    "mipmap-xxxhdpi": 192
+}
+res_dir = "android/app/src/main/res"
+try:
+    from PIL import Image
+    im = Image.open(src).convert("RGBA")
+    for folder, px in sizes.items():
+        d = os.path.join(res_dir, folder)
+        if os.path.isdir(d):
+            for fn in os.listdir(d):
+                if fn.endswith((".xml", ".webp")):
+                    os.remove(os.path.join(d, fn))
+            resized = im.resize((px, px), Image.Resampling.LANCZOS)
+            for name in ("ic_launcher.png", "ic_launcher_round.png", "ic_launcher_foreground.png"):
+                resized.save(os.path.join(d, name), format="PNG")
+    print("Iconos redimensionados con Pillow.")
+except Exception as e:
+    print("Fallback sin Pillow:", e)
+    for folder in sizes:
+        d = os.path.join(res_dir, folder)
+        if os.path.isdir(d):
+            for fn in os.listdir(d):
+                if fn.endswith((".xml", ".webp")):
+                    os.remove(os.path.join(d, fn))
+            for name in ("ic_launcher.png", "ic_launcher_round.png", "ic_launcher_foreground.png"):
+                shutil.copyfile(src, os.path.join(d, name))
+PYEOF
+          fi
+
+      - name: Configurar Gradle y firma
+        run: node scripts/configure-android.js
+
+      - name: Compilar APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Subir APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lafabricapp-2-0-v1.0.0-vc1
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
