@@ -82,9 +82,14 @@ input[type=text],input[type=number],input[type=password],textarea,select,.log,.h
 .ult{font-size:11.5px;color:var(--sub);margin-top:8px}
 #qrWrap{text-align:center;margin-top:10px}
 #qrWrap canvas{background:#fff;border-radius:8px;padding:6px}
+.modal-priv{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:85;display:none;align-items:center;justify-content:center;padding:12px}
+.modal-priv.abre{display:flex}
+.modal-priv .box{width:100%;max-width:540px;max-height:88vh;overflow:auto;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px}
+.chk-row{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--tx);margin:10px 0;cursor:pointer}
+.chk-row input{margin-top:2px;flex:none}
 </style>
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' https://lafabricapp-1-0.onrender.com https://cdnjs.cloudflare.com data: blob:; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; frame-src 'self' data: blob: https:; connect-src 'self' https://lafabricapp-1-0.onrender.com https://api.github.com https://*.onrender.com;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fabricapp-aako.onrender.com https://cdnjs.cloudflare.com data: blob:; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; frame-src 'self' data: blob: https:; connect-src 'self' https://fabricapp-aako.onrender.com https://api.github.com https://*.onrender.com;">
 <style id="lf-tema">html,body{background:#0d1117 !important;color:#e6edf3 !important;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif !important;font-size:16px !important}</style>
 </head>
 <body>
@@ -132,9 +137,13 @@ input[type=text],input[type=number],input[type=password],textarea,select,.log,.h
     <label style="margin-top:8px">…o elegí el archivo .html</label>
     <input type="file" id="manualFile" accept=".html,text/html">
 
-    <div class="editor" style="margin-top:10px">
-      <h3 style="font-size:14px;margin-bottom:4px">✍️ Firma de APK</h3>
-      <div class="d">Completá estos datos para firmar el APK. El archivo keystore puede cargarse aquí o incluirse dentro del ZIP.</div>
+    <div class="row" style="margin-top:10px">
+      <button type="button" class="btn" id="bToggleFirma" style="flex:1 1 auto">🔓 Firma de APK: Opcional (desactivada)</button>
+    </div>
+
+    <div class="editor hidden" id="cajaFirma" style="margin-top:8px">
+      <h3 style="font-size:14px;margin-bottom:4px">✍️ Firma de APK (Release)</h3>
+      <div class="d">Completá estos datos si querés firmar el APK. Si desactivás la firma arriba, el servidor compilará sin firma de release.</div>
       <label>Alias de la clave</label>
       <input type="text" id="firmaAlias" placeholder="mi-clave" autocomplete="off">
       <label>Contraseña del keystore</label>
@@ -247,6 +256,7 @@ input[type=text],input[type=number],input[type=password],textarea,select,.log,.h
   </div>
   <div class="row" style="margin-top:8px">
     <button type="button" class="btn" id="bSubirVersion" style="flex:1 1 auto">⬆️ Preparar actualización (+1 versionCode y SemVer)</button>
+    <button type="button" class="btn" id="bAbrirPriv" style="flex:1 1 auto">🛡️ Privacidad y Seguridad</button>
   </div>
   <div class="ult" id="infoRepoFijo">Repo fijo: — · Package ID: — · versionCode: 1</div>
   <label>Nota de cambio (Changelog)</label>
@@ -357,6 +367,47 @@ input[type=text],input[type=number],input[type=password],textarea,select,.log,.h
   <div class="ult" id="maintInfo"></div>
 </div>
 
+<div class="modal-priv" id="modalPriv" role="dialog" aria-modal="true" aria-labelledby="titPriv">
+  <div class="box">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+      <h2 id="titPriv" style="font-size:16px">🛡️ Privacidad y Seguridad para repos</h2>
+      <button type="button" class="btn pvx" id="bCerrarPriv">✕</button>
+    </div>
+    <div class="d" style="margin-bottom:10px">
+      Configurá el bloque de protección del HTML y el comportamiento del repositorio. Dejá repo privado desactivado si usás GitHub Pages gratuito o querés ahorrar minutos de cuota privada en pruebas.
+    </div>
+
+    <label class="chk-row">
+      <input type="checkbox" id="privInyectarRepo" checked>
+      <span><strong>Inyectar bloque de seguridad en el HTML al construir</strong> (se agrega antes de <code>&lt;/body&gt;</code> si aún no está presente)</span>
+    </label>
+    <label class="chk-row">
+      <input type="checkbox" id="privHeaders" checked>
+      <span>Encabezados <code>nosniff</code> y <code>referrer: no-referrer</code></span>
+    </label>
+    <label class="chk-row">
+      <input type="checkbox" id="privBloquearEval" checked>
+      <span>Bloquear <code>eval()</code> y <code>new Function()</code> en ejecución dinámica</span>
+    </label>
+    <label class="chk-row">
+      <input type="checkbox" id="privEnlacesSeguros" checked>
+      <span>Forzar <code>rel="noopener noreferrer"</code> en enlaces <code>http(s)</code> y exponer <code>lfSafeText()</code></span>
+    </label>
+    <label class="chk-row">
+      <input type="checkbox" id="privRepoPrivado">
+      <span>Solicitar repositorio privado al servidor (<code>privateRepo: true</code> en <code>/api/build</code>)</span>
+    </label>
+
+    <label style="margin-top:10px">Vista previa del bloque que se inyectará</label>
+    <textarea id="privPreviewCode" readonly style="min-height:130px"></textarea>
+
+    <div class="row" style="margin-top:10px">
+      <button type="button" class="btn" id="bInsertarPrivEditor">➕ Insertar en el HTML del editor ahora</button>
+      <button type="button" class="btn pri" id="bGuardarPriv">✓ Guardar configuración</button>
+    </div>
+  </div>
+</div>
+
 <footer>LaFabricApp · mate&code 🧉</footer>
 
 <div id="pv">
@@ -368,7 +419,7 @@ input[type=text],input[type=number],input[type=password],textarea,select,.log,.h
 </div>
 <script>
 // ===== CONFIGURACIÓN FIJA =====
-const API_FIJA = 'https://lafabricapp-1-0.onrender.com';
+const API_FIJA = 'https://fabricapp-aako.onrender.com';
 const TOKEN_FIJO = '';
 // ================================
 const API = localStorage.getItem('api_base') || API_FIJA;
@@ -379,6 +430,7 @@ let zipAssets = {};
 let extraAssets = {};
 let firmaAssets = {};
 let zipFirmaAssets = {};
+let firmaActiva = false;
 
 // ---- toast y utilidades ----
 function toast(msg, tipo) {
@@ -395,7 +447,7 @@ function log(msg, cls) {
   el.appendChild(line); el.scrollTop = el.scrollHeight;
 }
 function slugify(s) {
-  return (s || 'app').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  return (s || 'app').normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'app';
 }
 function tiempoRel(ts) {
@@ -606,6 +658,141 @@ $('bCfg').onclick = () => {
   }
 };
 
+// ---- firma de APK opcional ----
+function actualizarUiFirma() {
+  const btn = $('bToggleFirma');
+  const caja = $('cajaFirma');
+  if (!btn || !caja) return;
+  caja.classList.toggle('hidden', !firmaActiva);
+  btn.textContent = firmaActiva
+    ? '🔐 Firma de APK: Activada (tocar para desactivar)'
+    : '🔓 Firma de APK: Opcional (desactivada)';
+  btn.classList.toggle('pri', firmaActiva);
+}
+if ($('bToggleFirma')) {
+  $('bToggleFirma').onclick = () => {
+    firmaActiva = !firmaActiva;
+    actualizarUiFirma();
+    guardarForm();
+  };
+}
+
+// ---- ventana especial de Privacidad y Seguridad ----
+const PRIV_KEY = 'lf_priv_cfg_v1';
+const PRIV_IDS = ['privInyectarRepo','privHeaders','privBloquearEval','privEnlacesSeguros','privRepoPrivado'];
+
+function obtenerCfgPrivacidad() {
+  try {
+    return Object.assign({
+      privInyectarRepo: true,
+      privHeaders: true,
+      privBloquearEval: true,
+      privEnlacesSeguros: true,
+      privRepoPrivado: false
+    }, JSON.parse(localStorage.getItem(PRIV_KEY) || '{}'));
+  } catch (e) {
+    return {
+      privInyectarRepo: true,
+      privHeaders: true,
+      privBloquearEval: true,
+      privEnlacesSeguros: true,
+      privRepoPrivado: false
+    };
+  }
+}
+
+function construirBloqueSeguridad(cfg) {
+  const c = cfg || obtenerCfgPrivacidad();
+  const partes = [];
+  if (c.privHeaders) {
+    partes.push('<meta http-equiv="X-Content-Type-Options" content="nosniff">');
+    partes.push('<meta name="referrer" content="no-referrer">');
+  }
+  const jsLines = [];
+  if (c.privEnlacesSeguros) {
+    jsLines.push("window.lfSafeText=function(el,v){if(!el)return;el.textContent=v==null?'':String(v);};");
+    jsLines.push("document.addEventListener('click',function(ev){var a=ev.target&&ev.target.closest?ev.target.closest('a[href]'):null;if(!a)return;var h=a.getAttribute('href')||'';if(/^https?:\/\//i.test(h)){var rel=new Set((a.getAttribute('rel')||'').toLowerCase().split(/\s+/).filter(Boolean));rel.add('noopener');rel.add('noreferrer');a.setAttribute('rel',Array.from(rel).join(' '));}},true);");
+  }
+  if (c.privBloquearEval) {
+    jsLines.push("try{window.eval=function(){throw new Error('eval bloqueado');};window.Function=function(){throw new Error('Function bloqueado');};}catch(e){}");
+  }
+  if (jsLines.length) {
+    partes.push('<script id="lf-privacy-shield">(function(){' + jsLines.join('') + '})();<\/script>');
+  }
+  return partes.join('\n');
+}
+
+function aplicarEscudoAHtml(html, cfg) {
+  const c = cfg || obtenerCfgPrivacidad();
+  if (!c.privInyectarRepo || !html) return html;
+  if (html.indexOf('id="lf-privacy-shield"') !== -1) return html;
+  const bloque = construirBloqueSeguridad(c);
+  if (!bloque) return html;
+  const idx = html.lastIndexOf('</body>');
+  if (idx === -1) return html + '\n' + bloque;
+  return html.slice(0, idx) + bloque + '\n' + html.slice(idx);
+}
+
+function sincronizarModalPrivacidad() {
+  const cfg = obtenerCfgPrivacidad();
+  PRIV_IDS.forEach(id => {
+    const el = $(id);
+    if (el) el.checked = !!cfg[id];
+  });
+  if ($('privPreviewCode')) $('privPreviewCode').value = construirBloqueSeguridad(cfg);
+}
+
+function leerModalPrivacidad() {
+  const cfg = {};
+  PRIV_IDS.forEach(id => {
+    const el = $(id);
+    cfg[id] = el ? !!el.checked : false;
+  });
+  return cfg;
+}
+
+if ($('bAbrirPriv')) {
+  $('bAbrirPriv').onclick = () => {
+    sincronizarModalPrivacidad();
+    $('modalPriv').classList.add('abre');
+  };
+}
+if ($('bCerrarPriv')) {
+  $('bCerrarPriv').onclick = () => $('modalPriv').classList.remove('abre');
+}
+PRIV_IDS.forEach(id => {
+  const el = $(id);
+  if (el) el.addEventListener('change', () => {
+    if ($('privPreviewCode')) $('privPreviewCode').value = construirBloqueSeguridad(leerModalPrivacidad());
+  });
+});
+if ($('bGuardarPriv')) {
+  $('bGuardarPriv').onclick = () => {
+    const cfg = leerModalPrivacidad();
+    localStorage.setItem(PRIV_KEY, JSON.stringify(cfg));
+    $('modalPriv').classList.remove('abre');
+    toast('Configuración de Privacidad y Seguridad guardada ✓', 'ok');
+  };
+}
+if ($('bInsertarPrivEditor')) {
+  $('bInsertarPrivEditor').onclick = () => {
+    const cfg = leerModalPrivacidad();
+    localStorage.setItem(PRIV_KEY, JSON.stringify(cfg));
+    const actual = $('manualCode').value || '';
+    const nuevo = aplicarEscudoAHtml(actual, Object.assign({}, cfg, { privInyectarRepo: true }));
+    if (nuevo === actual) {
+      toast('El bloque ya está presente en el HTML o no hay opciones marcadas', 'ok');
+      return;
+    }
+    $('manualCode').value = nuevo;
+    pushUndoSnapshot(nuevo);
+    actualizarContadores();
+    guardarForm();
+    $('modalPriv').classList.remove('abre');
+    toast('Bloque de seguridad insertado en el HTML ✓', 'ok');
+  };
+}
+
 // ---- autoguardado del formulario y aislamiento de borradores ----
 const CAMPOS = ['fName','fRepoSlug','fPackageId','fVersion','fVersionCode','fChangelog','fProj','fType','manualCode','firmaAlias','firmaStoreType','pwaShortName','pwaDisplay','pwaOrientation','pwaThemeColor','pwaBgColor','pwaDesc'];
 let draftIdActual = localStorage.getItem('lf_active_draft') || 'default';
@@ -619,6 +806,7 @@ function setBorradores(obj) {
 function capturarEstadoFormulario() {
   const o = {};
   CAMPOS.forEach(id => { const el = $(id); if (el) o[id] = el.value; });
+  o.firmaActiva = !!firmaActiva;
   return o;
 }
 function actualizarSelectorBorradores() {
@@ -675,6 +863,8 @@ function aplicarDatosFormulario(o) {
     else if (id === 'pwaBgColor') el.value = '#0d1117';
     else el.value = '';
   });
+  firmaActiva = !!(o && o.firmaActiva);
+  actualizarUiFirma();
   sincronizarIdentidadProyecto(false);
   actualizarContadores();
   actualizarVisibilidadPwa();
@@ -727,7 +917,7 @@ $('bNuevoBorrador').onclick = () => {
   localStorage.setItem('lf_active_draft', draftIdActual);
   zipAssets = {}; extraAssets = {}; firmaAssets = {}; zipFirmaAssets = {}; renderChips();
   $('logoPrev').style.display = 'none'; $('logoPrev').src = '';
-  aplicarDatosFormulario({ fVersion: 'v1.0.0' });
+  aplicarDatosFormulario({ fVersion: 'v1.0.0', firmaActiva: false });
   const drafts = getBorradores();
   drafts[draftIdActual] = { id: draftIdActual, nombre: 'Nuevo cliente', version: 'v1.0.0', updatedAt: Date.now(), form: capturarEstadoFormulario() };
   setBorradores(drafts);
@@ -761,7 +951,7 @@ function normalizarPackageId(raw, repoSlug) {
     .toLowerCase()
     .replace(/[^a-z0-9._]/g, '')
     .replace(/\.{2,}/g, '.')
-    .replace(/^\.+|\.+$/g, '');
+    .replace(/^\.+|\.+$|\s+/g, '');
   if (clean.includes('.')) return clean;
   const base = slugify(repoSlug || clean || 'app').replace(/-/g, '') || 'app';
   return 'com.lafabricapp.' + base;
@@ -885,7 +1075,7 @@ $('manualFile').onchange = e => {
 
 // ---- editor / buscador HTML ----
 let coincidencias = [], idxSel = -1;
-function escaparHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escaparHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function buscarEnCodigo() {
   const q = $('buscar').value;
   const code = $('manualCode').value;
@@ -949,6 +1139,7 @@ $('fLogo').onchange = e => {
   rd.onload = () => { const im = $('logoPrev'); im.src = rd.result; im.style.display = 'block'; };
   rd.readAsDataURL(f);
 };
+
 // ---- ZIP upload ----
 function manejarArchivoZip(f) {
   if (!window.JSZip) { toast('JSZip no cargó. Revisá la conexión.', 'err'); return; }
@@ -1087,9 +1278,9 @@ $('firmaKeystoreZip').onchange = async e => {
 
 function renderChips() {
   const zc = Object.keys(zipAssets), ic = Object.keys(extraAssets), fc = Object.keys(firmaAssets), zfc = Object.keys(zipFirmaAssets);
-  $('zipChips').innerHTML = zc.map(n => '<span class="chip">' + n + '<button data-tipo="zip" data-n="' + n + '">✕</button></span>').join('');
-  $('imgChips').innerHTML = ic.map(n => '<span class="chip">' + n + '<button data-tipo="img" data-n="' + n + '">✕</button></span>').join('');
-  $('firmaChips').innerHTML = fc.map(n => '<span class="chip">🔐 ' + n + '<button data-tipo="firma" data-n="' + n + '">✕</button></span>').join('') + zfc.map(n => '<span class="chip">🔐 ' + n + '</span>').join('');
+  $('zipChips').innerHTML = zc.map(n => '<span class="chip">' + escaparHtml(n) + '<button data-tipo="zip" data-n="' + escaparHtml(n) + '">✕</button></span>').join('');
+  $('imgChips').innerHTML = ic.map(n => '<span class="chip">' + escaparHtml(n) + '<button data-tipo="img" data-n="' + escaparHtml(n) + '">✕</button></span>').join('');
+  $('firmaChips').innerHTML = fc.map(n => '<span class="chip">🔐 ' + escaparHtml(n) + '<button data-tipo="firma" data-n="' + escaparHtml(n) + '">✕</button></span>').join('') + zfc.map(n => '<span class="chip">🔐 ' + escaparHtml(n) + '</span>').join('');
   document.querySelectorAll('.chip button').forEach(b => b.onclick = () => {
     if (b.dataset.tipo === 'zip') delete zipAssets[b.dataset.n];
     else if (b.dataset.tipo === 'firma') delete firmaAssets[b.dataset.n];
@@ -1109,7 +1300,7 @@ function aplicarAssetsEnHtml(html) {
   const todos = Object.assign({}, zipAssets, extraAssets);
   Object.keys(todos).forEach(ruta => {
     const base = ruta.split('/').pop();
-    const regex = new RegExp('(src|href)=([\'"])(' + ruta.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '|' + base.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')\\2', 'g');
+    const regex = new RegExp('(src|href)=([\x27\"])(' + ruta.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '|' + base.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')\2', 'g');
     html = html.replace(regex, (m, attr, q) => attr + '=' + q + todos[ruta] + q);
   });
   return html;
@@ -1120,6 +1311,7 @@ function cerrarPv() { $('pv').classList.remove('abre'); $('pvFrame').srcdoc = ''
 $('bPvClose').onclick = cerrarPv;
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && $('pv').classList.contains('abre')) cerrarPv();
+  if (e.key === 'Escape' && $('modalPriv').classList.contains('abre')) $('modalPriv').classList.remove('abre');
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); if (!$('bBuild').disabled) $('bBuild').click(); }
 });
 $('bPrev').onclick = () => {
@@ -1129,6 +1321,7 @@ $('bPrev').onclick = () => {
     if (!confirm('El código no parece un HTML completo. ¿Previsualizar igual?')) return;
   }
   code = aplicarAssetsEnHtml(code);
+  code = aplicarEscudoAHtml(code, obtenerCfgPrivacidad());
   code = inyectarPaleta(code);
   $('pvFrame').removeAttribute('src');
   $('pvFrame').srcdoc = code;
@@ -1363,6 +1556,8 @@ $('bCancel').onclick = () => {
 $('bLimpiar').onclick = () => {
   if (!confirm('¿Vaciar todos los campos para crear otra app? El historial se conserva.')) return;
   CAMPOS.forEach(id => { const el = $(id); if (el) el.value = ''; });
+  firmaActiva = false;
+  actualizarUiFirma();
   $('fKind').value = 'web'; $('fProj').value = 'app'; $('fType').value = 'web'; $('fVersion').value = 'v1.0.0'; $('fVersionCode').value = '1'; delete $('fRepoSlug').dataset.manual; delete $('fPackageId').dataset.manual; sincronizarIdentidadProyecto(false);
   $('manualCode').value = '';
   $('fLogo').value = ''; $('firmaKeystore').value = ''; $('firmaKeystoreZip').value = ''; $('firmaZipMsg').textContent = '';
@@ -1454,18 +1649,22 @@ $('bBuild').onclick = async () => {
       if (!confirm('Aviso de validación: el código no tiene estructura HTML completa (<html>/<body>). ¿Continuar igual?')) return;
     }
   }
+
   const hasKeystore = Object.keys(firmaAssets).length > 0 || Object.keys(zipFirmaAssets).length > 0;
   const aliasVal = $('firmaAlias').value.trim();
   const storePassVal = $('firmaStorePassword').value;
-  if (hasKeystore && (!aliasVal || !storePassVal)) {
-    toast('Validación de firma: cargaste un keystore pero falta el Alias o la Contraseña.', 'err');
-    if (!aliasVal) $('firmaAlias').focus(); else $('firmaStorePassword').focus();
-    return;
+  if (firmaActiva) {
+    if (hasKeystore && (!aliasVal || !storePassVal)) {
+      toast('Validación de firma: cargaste un keystore pero falta el Alias o la Contraseña.', 'err');
+      if (!aliasVal) $('firmaAlias').focus(); else $('firmaStorePassword').focus();
+      return;
+    }
+    if (!hasKeystore && (aliasVal || storePassVal)) {
+      toast('Validación de firma: completaste datos de firma pero falta subir el archivo keystore.', 'err');
+      return;
+    }
   }
-  if (!hasKeystore && (aliasVal || storePassVal)) {
-    toast('Validación de firma: completaste datos de firma pero falta subir el archivo keystore.', 'err');
-    return;
-  }
+
   if (!navigator.onLine) {
     window._pendingBuild = true;
     toast('Sin conexión: se reintentará al reconectar', 'err');
@@ -1475,6 +1674,11 @@ $('bBuild').onclick = async () => {
   if (type === 'pwa' && kind === 'web') {
     await prepararPaquetePwa();
   }
+
+  const privCfg = obtenerCfgPrivacidad();
+  const htmlPreparado = kind === 'web'
+    ? aplicarEscudoAHtml(aplicarAssetsEnHtml($('manualCode').value), privCfg)
+    : '';
 
   const lf = $('fLogo').files[0];
   const logo = lf ? await logoDeArchivo(lf) : logoDeLetra(appName, type === 'pwa' ? ($('pwaThemeColor').value || '#8b5cf6') : '#8b5cf6');
@@ -1490,18 +1694,21 @@ $('bBuild').onclick = async () => {
     repoName: repoSlug,
     reuseExistingRepo: true,
     createNewRepoPerBuild: false,
+    privateRepo: !!privCfg.privRepoPrivado,
+    includeSecurityShield: !!privCfg.privInyectarRepo,
     packageId,
     applicationId: packageId,
     logo: logo,
-    signing: {
+    signing: firmaActiva ? {
+      enabled: true,
       alias: aliasVal,
       storePassword: storePassVal,
       keyPassword: $('firmaKeyPassword').value,
       storeType: $('firmaStoreType').value,
       keystoreFiles: Object.assign({}, zipFirmaAssets, firmaAssets)
-    },
+    } : null,
     model: '',
-    manualCode: kind === 'web' ? aplicarAssetsEnHtml($('manualCode').value) : '',
+    manualCode: htmlPreparado,
     assets: Object.assign({}, zipAssets, extraAssets)
   };
   setConstruyendo(true);
@@ -1525,7 +1732,7 @@ $('bBuild').onclick = async () => {
       $('bDlSite').classList.remove('hidden');
       $('bCopySite').onclick = () => { navigator.clipboard.writeText(r.siteUrl); toast('URL copiada', 'ok'); };
       $('bDlSite').onclick = () => {
-        const blob = new Blob([aplicarAssetsEnHtml($('manualCode').value)], { type: 'text/html' });
+        const blob = new Blob([htmlPreparado || aplicarAssetsEnHtml($('manualCode').value)], { type: 'text/html' });
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
         a.download = slugify(appName) + '.html'; a.click();
         setTimeout(() => URL.revokeObjectURL(a.href), 5000);
@@ -1609,6 +1816,91 @@ $('bBuild').onclick = async () => {
     ctl = null;
   }
 };
+
+// ---- descarga automática del APK desde el servidor ----
+function urlDescargaApk(repo, downloadUrl) {
+  return downloadUrl || (API + '/api/download-apk?repo=' + encodeURIComponent(repo));
+}
+
+function dispararDescargaBlob(blob, filename) {
+  const urlObj = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = urlObj;
+  a.download = filename || 'app.apk';
+  a.rel = 'noopener';
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(urlObj), 15000);
+}
+
+function abrirEnlaceRespaldoApk(url) {
+  const token = obtenerToken();
+  const sep = url.indexOf('?') === -1 ? '?' : '&';
+  const finalUrl = token ? (url + sep + 'token=' + encodeURIComponent(token)) : url;
+  if (window.Capacitor) {
+    window.open(finalUrl, '_system');
+  } else {
+    window.open(finalUrl, '_blank', 'noopener');
+  }
+}
+
+async function descargarConAuth(url, filename) {
+  try {
+    const token = obtenerToken();
+    const r = await fetch(url, {
+      credentials: 'include',
+      headers: token ? { Authorization: 'Bearer ' + token } : {}
+    });
+    if (!r.ok) throw new Error('Error ' + r.status);
+    const ct = (r.headers.get('content-type') || '').toLowerCase();
+    if (ct.includes('application/json') || ct.includes('text/html')) {
+      const txt = await r.text();
+      throw new Error('Respuesta no binaria: ' + txt.slice(0, 120));
+    }
+    const rawBlob = await r.blob();
+    if (!rawBlob.size) throw new Error('El servidor devolvió un archivo vacío');
+    const apkBlob = rawBlob.type === 'application/vnd.android.package-archive'
+      ? rawBlob
+      : new Blob([rawBlob], { type: 'application/vnd.android.package-archive' });
+    dispararDescargaBlob(apkBlob, filename);
+    return true;
+  } catch (e) {
+    console.error('Descarga APK:', e);
+    return false;
+  }
+}
+
+function construirUrlRespaldo(url) {
+  try {
+    const parsed = new URL(url, API);
+    const repoParam = parsed.searchParams.get('repo') || '';
+    if (/\/api\/download-apk/i.test(parsed.pathname)) {
+      return API + '/api/artifact' + (repoParam ? ('?repo=' + encodeURIComponent(repoParam)) : '');
+    }
+  } catch (e) {}
+  return '';
+}
+
+async function descargarAutomaticamente(url, filename) {
+  const msg = $('apkDownloadMsg');
+  if (msg) { msg.classList.remove('hidden'); msg.textContent = 'Descargando el APK…'; }
+  let ok = await descargarConAuth(url, filename);
+  const respaldo = construirUrlRespaldo(url);
+  if (!ok && respaldo) {
+    if (msg) msg.textContent = 'Probando ruta alternativa del servidor (/api/artifact)…';
+    ok = await descargarConAuth(respaldo, filename);
+  }
+  if (!ok) {
+    const targetUrl = respaldo || url;
+    abrirEnlaceRespaldoApk(targetUrl);
+    if (msg) msg.textContent = 'Si /api/download-apk no existe en Render, revisá /api/artifact o bajá el APK desde el botón “Repositorio → Actions”.';
+    return false;
+  }
+  if (msg) msg.textContent = '✓ Descarga iniciada. Si no aparece, tocá “Descargar APK”.';
+  return true;
+}
 
 // ---- mantenimiento: respaldo, restauración y salud ----
 $('bHealthCheck').onclick = async () => {
