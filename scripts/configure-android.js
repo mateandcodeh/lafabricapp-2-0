@@ -4,11 +4,25 @@ const path = require('path');
 const gradlePath = path.join(process.cwd(), 'android', 'app', 'build.gradle');
 let gradle = fs.readFileSync(gradlePath, 'utf8');
 
-gradle = gradle.replace(/applicationId\s+["'][^"']+["']/g, 'applicationId "com.lafabricapp.lafabricapp20"');
-gradle = gradle.replace(/versionCode\s+\d+/g, 'versionCode 1');
-gradle = gradle.replace(/versionName\s+["'][^"']+["']/g, 'versionName "1.0.0"');
+const targetPkg = "com.lafabricapp.lafabricapp20";
+const targetVer = "1.0.0";
+const targetVc = 1;
+const useSigning = true;
 
-if (false) {
+gradle = gradle.split('\n').map(line => {
+  if (line.indexOf('applicationId') !== -1 && (line.indexOf('"') !== -1 || line.indexOf("'") !== -1)) {
+    return '        applicationId "' + targetPkg + '"';
+  }
+  if (line.indexOf('versionCode') !== -1) {
+    return '        versionCode ' + targetVc;
+  }
+  if (line.indexOf('versionName') !== -1 && (line.indexOf('"') !== -1 || line.indexOf("'") !== -1)) {
+    return '        versionName "' + targetVer + '"';
+  }
+  return line;
+}).join('\n');
+
+if (useSigning) {
   const signingBlock = [
     '    signingConfigs {',
     '        release {',
@@ -29,7 +43,7 @@ if (false) {
     ''
   ].join('\n');
 
-  if (!gradle.includes('signingConfigs {') && gradle.includes('buildTypes {')) {
+  if (gradle.indexOf('signingConfigs {') === -1 && gradle.indexOf('buildTypes {') !== -1) {
     gradle = gradle.replace('buildTypes {', signingBlock + '    buildTypes {');
   }
 
@@ -58,11 +72,11 @@ if (false) {
           '            shrinkResources false',
           '        }'
         ].join('\n');
-        gradle = gradle.slice(0, releaseIdx) + newRelease + gradle.slice(endBrace + 1);
+        gradle = gradle.slice(0, relIdx) + newRelease + gradle.slice(endBrace + 1);
       }
     }
   }
 }
 
 fs.writeFileSync(gradlePath, gradle, 'utf8');
-console.log('Configurado build.gradle -> packageId=com.lafabricapp.lafabricapp20, versionCode=1, versionName=1.0.0');
+console.log('Configurado build.gradle -> ' + targetPkg + ' vc=' + targetVc + ' v=' + targetVer);
